@@ -2,6 +2,7 @@
 #include <fbxsdk.h>
 #include <gcroot.h>
 #include <map>
+#include <queue>
 #include <unordered_map>
 
 class ZoneExporter
@@ -26,7 +27,10 @@ private:
     void process_model(Lumina::Models::Models::Model^ model, FbxNode** node);
     bool init(System::String^);
     FbxMesh* create_mesh(Lumina::Models::Models::Mesh^, const char*);
+    void export_sgb_models(Lumina::GameData^ data, SaintCoinach::Graphics::Sgb::SgbFile^ sgbFile, FbxNode** node);
     bool create_material(Lumina::Models::Materials::Material^ mat, FbxSurfacePhong** out);
+    void makeMaybeLayeredTexture(std::queue<fbxsdk::FbxFileTexture*>& textures, std::string& std_material_name, FbxPropertyT<FbxDouble3>& out);
+    bool create_material0(Lumina::Models::Materials::Material^ mat, FbxSurfacePhong** out);
     void extract_textures(Lumina::Models::Materials::Material^ mat);
     bool save_scene();
     void uninit();

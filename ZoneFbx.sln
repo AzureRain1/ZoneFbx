@@ -1,11 +1,16 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 16
-VisualStudioVersion = 16.0.31129.286
+# Visual Studio Version 17
+VisualStudioVersion = 17.3.32929.385
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ZoneFbx", "ZoneFbx\ZoneFbx.vcxproj", "{44D3FB44-8DCC-42C8-A6FC-A387F6FE78B7}"
+	ProjectSection(ProjectDependencies) = postProject
+		{2F93771A-53E1-4FAE-BBA6-1AB75EC99DFC} = {2F93771A-53E1-4FAE-BBA6-1AB75EC99DFC}
+	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Lumina", "Lumina\src\Lumina\Lumina.csproj", "{00F405FB-37D6-465D-B449-A5D2DF9B77D1}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Lumina", "Lumina\src\Lumina\Lumina.csproj", "{00F405FB-37D6-465D-B449-A5D2DF9B77D1}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Lumina.Excel", "Lumina\src\Lumina.Excel\Lumina.Excel.csproj", "{2F93771A-53E1-4FAE-BBA6-1AB75EC99DFC}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -18,6 +23,7 @@ Global
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{44D3FB44-8DCC-42C8-A6FC-A387F6FE78B7}.Debug|Any CPU.ActiveCfg = Debug|Win32
+		{44D3FB44-8DCC-42C8-A6FC-A387F6FE78B7}.Debug|Any CPU.Build.0 = Debug|Win32
 		{44D3FB44-8DCC-42C8-A6FC-A387F6FE78B7}.Debug|x64.ActiveCfg = Debug|x64
 		{44D3FB44-8DCC-42C8-A6FC-A387F6FE78B7}.Debug|x64.Build.0 = Debug|x64
 		{44D3FB44-8DCC-42C8-A6FC-A387F6FE78B7}.Debug|x86.ActiveCfg = Debug|Win32
@@ -39,6 +45,18 @@ Global
 		{00F405FB-37D6-465D-B449-A5D2DF9B77D1}.Release|x64.Build.0 = Release|Any CPU
 		{00F405FB-37D6-465D-B449-A5D2DF9B77D1}.Release|x86.ActiveCfg = Release|Any CPU
 		{00F405FB-37D6-465D-B449-A5D2DF9B77D1}.Release|x86.Build.0 = Release|Any CPU
+		{2F93771A-53E1-4FAE-BBA6-1AB75EC99DFC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2F93771A-53E1-4FAE-BBA6-1AB75EC99DFC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2F93771A-53E1-4FAE-BBA6-1AB75EC99DFC}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{2F93771A-53E1-4FAE-BBA6-1AB75EC99DFC}.Debug|x64.Build.0 = Debug|Any CPU
+		{2F93771A-53E1-4FAE-BBA6-1AB75EC99DFC}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{2F93771A-53E1-4FAE-BBA6-1AB75EC99DFC}.Debug|x86.Build.0 = Debug|Any CPU
+		{2F93771A-53E1-4FAE-BBA6-1AB75EC99DFC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2F93771A-53E1-4FAE-BBA6-1AB75EC99DFC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2F93771A-53E1-4FAE-BBA6-1AB75EC99DFC}.Release|x64.ActiveCfg = Release|Any CPU
+		{2F93771A-53E1-4FAE-BBA6-1AB75EC99DFC}.Release|x64.Build.0 = Release|Any CPU
+		{2F93771A-53E1-4FAE-BBA6-1AB75EC99DFC}.Release|x86.ActiveCfg = Release|Any CPU
+		{2F93771A-53E1-4FAE-BBA6-1AB75EC99DFC}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

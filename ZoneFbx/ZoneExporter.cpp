@@ -2,6 +2,7 @@
 #include "ZoneExporter.h"
 
 #include <ostream>
+#include <iostream>
 #include <msclr/marshal_cppstd.h>
 
 #include "Util.h"
@@ -88,46 +89,196 @@ bool ZoneExporter::process_terrain()
 
 bool ZoneExporter::process_bg()
 {
-    auto bg_path = "bg/" + Util::get_str_handle(zone_path.substr(0, zone_path.length() - 5)) + "/bg.lgb";
-    auto bg = data->GetFile<Lumina::Data::Files::LgbFile^>(bg_path);
+	System::Collections::Generic::List<System::String^>^ fnames =
+        gcnew System::Collections::Generic::List<System::String^>();
+	fnames->Add("/bg.lgb");
+    fnames->Add("/planmap.lgb");
+    fnames->Add("/planevent.lgb");
 
-    if (bg == nullptr)
-        return false;
+    for each(System::String^ s in fnames) {
+		auto bg_path = "bg/" + Util::get_str_handle(zone_path.substr(0, zone_path.length() - 5)) + s;
+		auto bg = data->GetFile<Lumina::Data::Files::LgbFile^>(bg_path);
 
-    for(int i = 0; i < bg->Layers->Length; i++)
-    {
-        auto layer = %bg->Layers[i];
-        auto layer_node = FbxNode::Create(scene, Util::get_std_str(layer->Name).c_str());
-        
-        for (int j = 0; j < layer->InstanceObjects->Length; j++)
+        if (bg == nullptr)
+            return false;
+
+        for (int i = 0; i < bg->Layers->Length; i++)
         {
-            auto object = %layer->InstanceObjects[j];
-            auto object_node = FbxNode::Create(scene, Util::get_std_str(object->Name).c_str());
-            
-            object_node->LclTranslation.Set(FbxDouble3(object->Transform.Translation.X, object->Transform.Translation.Y, object->Transform.Translation.Z));
-            object_node->LclRotation.Set(FbxDouble3(Util::degrees(object->Transform.Rotation.X),
-                                                    Util::degrees(object->Transform.Rotation.Y),
-                                                    Util::degrees(object->Transform.Rotation.Z)));
-            object_node->LclScaling.Set(FbxDouble3(object->Transform.Scale.X, object->Transform.Scale.Y, object->Transform.Scale.Z));
-            
-            if (object->AssetType == Lumina::Data::Parsing::Layer::LayerEntryType::BG)
-            {
-                auto instance_object = static_cast<Lumina::Data::Parsing::Layer::LayerCommon::BGInstanceObject^>(object->Object);
-                auto object_path = instance_object->AssetPath;
-                auto model = gcnew Lumina::Models::Models::Model(data, object_path, Lumina::Models::Models::Model::ModelLod::High, 1);
-                
-                auto model_node = FbxNode::Create(scene, Util::get_std_str(object_path->Substring(object_path->LastIndexOf('/') + 1)).c_str());
-                // model_node->LclTranslation.Set(FbxDouble3(object->Transform.Translation.X, object->Transform.Translation.Y, object->Transform.Translation.Z));
-                // model_node->LclRotation.Set(FbxDouble3(object->Transform.Rotation.X, object->Transform.Rotation.Y, object->Transform.Rotation.Z));
-                // model_node->LclScaling.Set(FbxDouble3(object->Transform.Scale.X, object->Transform.Scale.Y, object->Transform.Scale.Z));
-                
-                process_model(model, &model_node);
+            auto layer = % bg->Layers[i];
+            auto layer_node = FbxNode::Create(scene, Util::get_std_str(layer->Name).c_str());
 
-                object_node->AddChild(model_node);
-                layer_node->AddChild(object_node);
+            for (int j = 0; j < layer->InstanceObjects->Length; j++)
+            {
+                auto object = % layer->InstanceObjects[j];
+                auto object_node = FbxNode::Create(scene, Util::get_std_str(object->Name).c_str());
+
+                object_node->LclTranslation.Set(FbxDouble3(object->Transform.Translation.X, object->Transform.Translation.Y, object->Transform.Translation.Z));
+                object_node->LclRotation.Set(FbxDouble3(Util::degrees(object->Transform.Rotation.X),
+                    Util::degrees(object->Transform.Rotation.Y),
+                    Util::degrees(object->Transform.Rotation.Z)));
+                object_node->LclScaling.Set(FbxDouble3(object->Transform.Scale.X, object->Transform.Scale.Y, object->Transform.Scale.Z));
+
+                switch (object->AssetType)
+                {
+                case Lumina::Data::Parsing::Layer::LayerEntryType::LayLight:
+                {
+                    auto instance_object = static_cast<Lumina::Data::Parsing::Layer::LayerCommon::LightInstanceObject^>(object->Object);
+                    if (instance_object->LightType == Lumina::Data::Parsing::Layer::LightType::None ||
+                            instance_object->LightType == Lumina::Data::Parsing::Layer::LightType::Line)
+                        break;
+
+                    auto light_node = FbxLight::Create (scene, "Light");
+                    switch (instance_object->LightType) {
+                    case Lumina::Data::Parsing::Layer::LightType::Point:
+                    case Lumina::Data::Parsing::Layer::LightType::Specular:
+                        light_node->LightType.Set(FbxLight::EType::ePoint);
+                        break;
+                    case Lumina::Data::Parsing::Layer::LightType::Directional:
+                        light_node->LightType.Set(FbxLight::EType::eDirectional);
+                        break;
+                    case Lumina::Data::Parsing::Layer::LightType::Spot:
+                        light_node->LightType.Set(FbxLight::EType::eSpot);
+                        break;
+                    case Lumina::Data::Parsing::Layer::LightType::Plane:
+                        light_node->LightType.Set(FbxLight::EType::eArea);
+                        light_node->AreaLightShape.Set(FbxLight::EAreaLightShape::eRectangle);
+                        break;
+                    default:
+                        light_node->LightType.Set(FbxLight::EType::ePoint);
+                        break;
+                    }
+
+                    light_node->Color.Set(FbxDouble3(instance_object->DiffuseColorHDRI.Red,
+                        instance_object->DiffuseColorHDRI.Green, instance_object->DiffuseColorHDRI.Blue));
+                    light_node->Intensity.Set(static_cast<double>(instance_object->DiffuseColorHDRI.Intensity) * 100.);
+                    light_node->InnerAngle.Set(0.);
+                    light_node->OuterAngle.Set(static_cast<double>(instance_object->ConeDegree));
+                    light_node->CastShadows.Set(instance_object->BGShadowEnabled > 0);
+                    light_node->DecayStart.Set(25.);
+
+                    object_node->SetNodeAttribute(light_node);
+                    // Technically this should be SetPostTargetRotation but that doesn't work with Blender importer
+                    object_node->LclRotation.Set(FbxDouble3(
+                        object_node->LclRotation.Get().mData[0] - 90.,
+                        object_node->LclRotation.Get().mData[1],
+                        object_node->LclRotation.Get().mData[2]
+                    ));
+                    layer_node->AddChild(object_node);
+                    break;
+                }
+                case Lumina::Data::Parsing::Layer::LayerEntryType::BG:
+                {
+                    auto instance_object = static_cast<Lumina::Data::Parsing::Layer::LayerCommon::BGInstanceObject^>(object->Object);
+                    auto object_path = instance_object->AssetPath;
+                    if (!data->FileExists(object_path)) break;
+                    auto model = gcnew Lumina::Models::Models::Model(data, object_path, Lumina::Models::Models::Model::ModelLod::High, 1);
+
+                    auto model_node = FbxNode::Create(scene, Util::get_std_str(object_path->Substring(object_path->LastIndexOf('/') + 1)).c_str());
+
+                    process_model(model, &model_node);
+
+                    object_node->AddChild(model_node);
+                    layer_node->AddChild(object_node);
+
+                    break;
+                }
+                case Lumina::Data::Parsing::Layer::LayerEntryType::SharedGroup:
+                {
+                    auto instance_object = static_cast<Lumina::Data::Parsing::Layer::LayerCommon::SharedGroupInstanceObject^>(object->Object);
+                    if (!instance_object->SgbFileObj) break;
+                    auto object_path = instance_object->AssetPath;
+
+                    export_sgb_models(data, instance_object->SgbFileObj, &object_node);
+                    for each (SaintCoinach::Graphics::Sgb::ISgbData^ rootGimGroupF in instance_object->SgbFileObj->Data) {
+                        if (rootGimGroupF == nullptr || rootGimGroupF->GetType() != SaintCoinach::Graphics::Sgb::SgbGroup::typeid)
+                            continue;
+                        else
+                        {
+                            auto rootGimGroup = static_cast<SaintCoinach::Graphics::Sgb::SgbGroup^>(rootGimGroupF);
+                            for each (SaintCoinach::Graphics::Sgb::ISgbGroupEntry^ rootGimEntryF in rootGimGroup->Entries) {
+                                if (rootGimEntryF == nullptr || rootGimEntryF->GetType() != SaintCoinach::Graphics::Sgb::SgbGimmickEntry::typeid)
+                                    continue;
+                                else
+                                {
+                                    auto rootGimEntry = static_cast<SaintCoinach::Graphics::Sgb::SgbGimmickEntry^>(rootGimEntryF);
+                                    if (rootGimEntry->Gimmick != nullptr) {
+                                        auto root_gim_entry_node = FbxNode::Create(scene, Util::get_std_str(rootGimEntry->Name).c_str());
+
+                                        root_gim_entry_node->LclTranslation.Set(FbxDouble3(rootGimEntry->Header.Translation.X,
+                                            rootGimEntry->Header.Translation.Y, rootGimEntry->Header.Translation.Z));
+                                        root_gim_entry_node->LclRotation.Set(FbxDouble3(Util::degrees(rootGimEntry->Header.Rotation.X),
+                                            Util::degrees(rootGimEntry->Header.Rotation.Y),
+                                            Util::degrees(rootGimEntry->Header.Rotation.Z)));
+                                        root_gim_entry_node->LclScaling.Set(FbxDouble3(rootGimEntry->Header.Scale.X,
+                                            rootGimEntry->Header.Scale.Y, rootGimEntry->Header.Scale.Z));
+                                        export_sgb_models(data, rootGimEntry->Gimmick, &root_gim_entry_node);
+                                        for each (SaintCoinach::Graphics::Sgb::ISgbData^ subGimGroupF in rootGimEntry->Gimmick->Data) {
+                                            if (subGimGroupF == nullptr || subGimGroupF->GetType() != SaintCoinach::Graphics::Sgb::SgbGroup::typeid)
+                                                continue;
+                                            else
+                                            {
+                                                auto subGimGroup = static_cast<SaintCoinach::Graphics::Sgb::SgbGroup^>(subGimGroupF);
+                                                for each (SaintCoinach::Graphics::Sgb::ISgbGroupEntry^ subGimEntryF in subGimGroup->Entries) {
+                                                    if (subGimEntryF == nullptr || subGimEntryF->GetType() != SaintCoinach::Graphics::Sgb::SgbGimmickEntry::typeid)
+                                                        continue;
+                                                    else
+                                                    {
+                                                        auto subGimEntry = static_cast<SaintCoinach::Graphics::Sgb::SgbGimmickEntry^>(subGimEntryF);
+                                                        auto sub_gim_entry_node = FbxNode::Create(scene, Util::get_std_str(subGimEntry->Name).c_str());
+
+                                                        sub_gim_entry_node->LclTranslation.Set(FbxDouble3(subGimEntry->Header.Translation.X,
+                                                            subGimEntry->Header.Translation.Y, subGimEntry->Header.Translation.Z));
+                                                        sub_gim_entry_node->LclRotation.Set(FbxDouble3(Util::degrees(subGimEntry->Header.Rotation.X),
+                                                            Util::degrees(subGimEntry->Header.Rotation.Y),
+                                                            Util::degrees(subGimEntry->Header.Rotation.Z)));
+                                                        sub_gim_entry_node->LclScaling.Set(FbxDouble3(subGimEntry->Header.Scale.X,
+                                                            subGimEntry->Header.Scale.Y, subGimEntry->Header.Scale.Z));
+                                                        //var subGimTransform = CreateMatrix(subGimEntry.Header.Translation, subGimEntry.Header.Rotation, subGimEntry.Header.Scale);
+                                                        export_sgb_models(data, subGimEntry->Gimmick, &sub_gim_entry_node);
+
+                                                        root_gim_entry_node->AddChild(sub_gim_entry_node);
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        object_node->AddChild(root_gim_entry_node);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    layer_node->AddChild(object_node);
+                    break;
+                }
+                case Lumina::Data::Parsing::Layer::LayerEntryType::EventObject:
+                {
+                    auto instance_object = static_cast<Lumina::Data::Parsing::Layer::LayerCommon::EventInstanceObject^>(object->Object);
+                    auto eventObjectSheet = data->GetExcelSheet<Lumina::Excel::GeneratedSheets::EObj^>();
+                    auto exportedSgSheet = data->GetExcelSheet<Lumina::Excel::GeneratedSheets::ExportedSG^>();
+
+                    for each (Lumina::Excel::GeneratedSheets::EObj^ row in eventObjectSheet) {
+                        if (row->RowId == instance_object->ParentData.BaseId) {
+                            auto sgbPathRow = row->SgbPath->Value;
+                            if (sgbPathRow) {
+                                System::String^ sgbPath = sgbPathRow->SgbPath;
+                                auto rawFile = data->GetFile(sgbPath);
+                                auto sgbFile = gcnew SaintCoinach::Graphics::Sgb::SgbFile(data,
+                                    rawFile->Data);
+                                export_sgb_models(data, sgbFile, &object_node);
+
+                                layer_node->AddChild(object_node);
+                            }
+                        }
+                    }
+                    break;
+                }
+				default:
+					break;
+				}
             }
+            scene->GetRootNode()->AddChild(layer_node);
         }
-        scene->GetRootNode()->AddChild(layer_node);
     }
     
     return true;
@@ -249,6 +400,192 @@ FbxMesh* ZoneExporter::create_mesh(Lumina::Models::Models::Mesh^ game_mesh, cons
     return mesh;
 }
 
+void ZoneExporter::export_sgb_models(Lumina::GameData^ data, SaintCoinach::Graphics::Sgb::SgbFile^ sgbFile, FbxNode** node)
+{
+    for each(SaintCoinach::Graphics::Sgb::ISgbData^ sgbGroupF in sgbFile->Data) {
+        if (sgbGroupF == nullptr || sgbGroupF->GetType() != SaintCoinach::Graphics::Sgb::SgbGroup::typeid)
+            continue;
+        else
+        {
+            auto sgbGroup = static_cast<SaintCoinach::Graphics::Sgb::SgbGroup^>(sgbGroupF);
+            bool newGroup = true;
+
+            for each (SaintCoinach::Graphics::Sgb::ISgbGroupEntry^ sgb1CEntryF in sgbGroup->Entries) {
+                if (sgb1CEntryF == nullptr || sgb1CEntryF->GetType() != SaintCoinach::Graphics::Sgb::SgbGroup1CEntry::typeid)
+                    continue;
+                else
+                {
+                    auto sgb1CEntry = static_cast<SaintCoinach::Graphics::Sgb::SgbGroup1CEntry^>(sgb1CEntryF);
+                    if (sgb1CEntry->Gimmick != nullptr) {
+                        export_sgb_models(data, sgb1CEntry->Gimmick, node);
+                        for each(SaintCoinach::Graphics::Sgb::ISgbData^ subGimGroupF in sgb1CEntry->Gimmick->Data) {
+                            if (subGimGroupF == nullptr || subGimGroupF->GetType() != SaintCoinach::Graphics::Sgb::SgbGroup::typeid)
+                                continue;
+                            else
+                            {
+                                auto subGimGroup = static_cast<SaintCoinach::Graphics::Sgb::SgbGroup^>(subGimGroupF);
+                                for each(SaintCoinach::Graphics::Sgb::ISgbGroupEntry^ subGimEntryF in subGimGroup->Entries) {
+                                    if (subGimEntryF == nullptr || subGimEntryF->GetType() != SaintCoinach::Graphics::Sgb::SgbGimmickEntry::typeid)
+                                        continue;
+                                    else
+                                    {
+                                        auto subGimEntry = static_cast<SaintCoinach::Graphics::Sgb::SgbGimmickEntry^>(subGimEntryF);
+                                        auto sub_gim_entry_node = FbxNode::Create(scene, Util::get_std_str(subGimEntry->Name).c_str());
+
+                                        sub_gim_entry_node->LclTranslation.Set(FbxDouble3(subGimEntry->Header.Translation.X,
+                                            subGimEntry->Header.Translation.Y, subGimEntry->Header.Translation.Z));
+                                        sub_gim_entry_node->LclRotation.Set(FbxDouble3(Util::degrees(subGimEntry->Header.Rotation.X),
+                                            Util::degrees(subGimEntry->Header.Rotation.Y),
+                                            Util::degrees(subGimEntry->Header.Rotation.Z)));
+                                        sub_gim_entry_node->LclScaling.Set(FbxDouble3(subGimEntry->Header.Scale.X,
+                                            subGimEntry->Header.Scale.Y, subGimEntry->Header.Scale.Z));
+                                        export_sgb_models(data, subGimEntry->Gimmick, &sub_gim_entry_node);
+
+                                        (*node)->AddChild(sub_gim_entry_node);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            for each (SaintCoinach::Graphics::Sgb::ISgbGroupEntry^ mdlF in sgbGroup->Entries) {
+                if (mdlF == nullptr || mdlF->GetType() != SaintCoinach::Graphics::Sgb::SgbModelEntry::typeid)
+                    continue;
+                else
+                {
+                    auto mdl = static_cast<SaintCoinach::Graphics::Sgb::SgbModelEntry^>(mdlF);
+                    System::String^ mdlFilePath = mdl->ModelFilePath;
+                    auto model = gcnew Lumina::Models::Models::Model(data,
+                        mdlFilePath,
+                        Lumina::Models::Models::Model::ModelLod::High,
+                        1);
+
+                    auto model_node = FbxNode::Create(scene, Util::get_std_str(mdlFilePath->Substring(mdlFilePath->LastIndexOf('/') + 1)).c_str());
+
+                    model_node->LclTranslation.Set(FbxDouble3(mdl->Header.Translation.X,
+                        mdl->Header.Translation.Y, mdl->Header.Translation.Z));
+                    model_node->LclRotation.Set(FbxDouble3(Util::degrees(mdl->Header.Rotation.X),
+                        Util::degrees(mdl->Header.Rotation.Y),
+                        Util::degrees(mdl->Header.Rotation.Z)));
+                    model_node->LclScaling.Set(FbxDouble3(mdl->Header.Scale.X,
+                        mdl->Header.Scale.Y, mdl->Header.Scale.Z));
+                    process_model(model, &model_node);
+
+                    (*node)->AddChild(model_node);
+                }
+            }
+        }
+    }
+}
+
+bool ZoneExporter::create_material0(Lumina::Models::Materials::Material^ mat, FbxSurfacePhong** out)
+{
+    auto mat_path = mat->MaterialPath;
+    auto material_name = mat_path->Substring(mat_path->LastIndexOf('/') + 1);
+    auto std_material_name = Util::get_std_str(material_name);
+
+    const auto hash = mat->File->FilePath->IndexHash;
+    auto result = material_cache->find(hash);
+    if (result != material_cache->end())
+    {
+        *out = result->second;
+        return true;
+    }
+    extract_textures(mat);
+    *out = FbxSurfacePhong::Create(scene, std_material_name.c_str());
+
+    (*out)->AmbientFactor.Set(1.);
+    (*out)->DiffuseFactor.Set(1.);
+    (*out)->SpecularFactor.Set(0.25);
+    (*out)->ReflectionFactor.Set(0.);
+    (*out)->BumpFactor.Set(0.4);  // looks good on most things, higher will cause wrong lighting
+    (*out)->Shininess.Set(25.);
+
+    (*out)->ShadingModel.Set("Phong");
+
+    // really don't like raw pointers
+    std::queue<FbxFileTexture*> diffuseTextures, normalTextures, specularTextures;
+
+    for (int i = 0; i < mat->Textures->Length; i++)
+    {
+        if (mat->Textures[i]->TexturePath->Contains("dummy"))
+            continue;
+
+        auto usage_name = mat->Textures[i]->TextureUsageSimple.ToString();
+
+        auto texture = FbxFileTexture::Create(scene, Util::get_std_str(usage_name).c_str());
+        auto rel = Util::get_relative_texture_path(out_folder, zone_code, mat->Textures[i]->TexturePath);
+        texture->SetFileName(rel.c_str());
+        texture->SetMappingType(FbxTexture::eUV);
+        texture->SetTextureUse(FbxTexture::eStandard);
+        texture->SetMaterialUse(FbxFileTexture::eModelMaterial);
+        texture->SetSwapUV(false);
+        texture->SetTranslation(0.0, 0.0);
+        texture->SetScale(1.0, 1.0);
+        texture->SetRotation(0.0, 0.0);
+
+        //System::Console::WriteLine(mat->Textures[i]->TextureUsageRaw);
+        //System::Console::WriteLine(mat->Textures[i]->TextureUsageSimple);
+        switch (mat->Textures[i]->TextureUsageRaw)
+        {
+        case Lumina::Data::Parsing::TextureUsage::Sampler0:
+        case Lumina::Data::Parsing::TextureUsage::Sampler1:
+        case Lumina::Data::Parsing::TextureUsage::SamplerColorMap0:
+        case Lumina::Data::Parsing::TextureUsage::SamplerColorMap1:
+            diffuseTextures.push(texture); break;
+        case Lumina::Data::Parsing::TextureUsage::SamplerSpecularMap0:
+        case Lumina::Data::Parsing::TextureUsage::SamplerSpecularMap1:
+            normalTextures.push(texture); break;
+        case Lumina::Data::Parsing::TextureUsage::SamplerNormalMap0:
+        case Lumina::Data::Parsing::TextureUsage::SamplerNormalMap1:
+            specularTextures.push(texture); break;
+        default:;
+        }
+        // We are ignoring the 2nd texture that they use for blending
+        /*switch (mat->Textures[i]->TextureUsageRaw)
+        {
+        case Lumina::Data::Parsing::TextureUsage::SamplerColorMap0:
+            (*out)->Diffuse.ConnectSrcObject(texture); break;
+        case Lumina::Data::Parsing::TextureUsage::SamplerSpecularMap0:
+            (*out)->Specular.ConnectSrcObject(texture); break;
+        case Lumina::Data::Parsing::TextureUsage::SamplerNormalMap0:
+            (*out)->NormalMap.ConnectSrcObject(texture);
+            break;
+        default:;
+        }*/
+    }
+
+    // connect textures
+    makeMaybeLayeredTexture(diffuseTextures, std_material_name, (*out)->Diffuse);
+    makeMaybeLayeredTexture(normalTextures, std_material_name, (*out)->NormalMap);
+    makeMaybeLayeredTexture(specularTextures, std_material_name, (*out)->Specular);
+
+    material_cache->insert({ hash, *out });
+
+    return true;
+}
+
+void ZoneExporter::makeMaybeLayeredTexture(std::queue<fbxsdk::FbxFileTexture*>& textures, std::string& std_material_name, FbxPropertyT<FbxDouble3>& out)
+{
+    if (textures.size() > 1) {
+        auto layeredTexture = FbxLayeredTexture::Create(scene, (std_material_name + std::string("_texture_group")).c_str());
+        int index = 0;
+        while (!textures.empty()) {
+            layeredTexture->ConnectSrcObject(textures.front());
+            textures.pop();
+            layeredTexture->SetTextureBlendMode(index, FbxLayeredTexture::EBlendMode::eAdditive);
+            index++;
+        }
+        out.ConnectSrcObject(layeredTexture);
+    }
+    else if (!textures.empty()) {
+        out.ConnectSrcObject(textures.front());
+        textures.pop();
+    }
+}
+
 bool ZoneExporter::create_material(Lumina::Models::Materials::Material^ mat, FbxSurfacePhong** out)
 {
     auto mat_path = mat->MaterialPath;
@@ -267,7 +604,10 @@ bool ZoneExporter::create_material(Lumina::Models::Materials::Material^ mat, Fbx
 
     (*out)->AmbientFactor.Set(1.);
     (*out)->DiffuseFactor.Set(1.);
-    (*out)->SpecularFactor.Set(0.3);
+    (*out)->SpecularFactor.Set(0.25);
+    (*out)->ReflectionFactor.Set(0.);
+    (*out)->BumpFactor.Set(0.3);  // looks good on most things, higher will cause wrong lighting
+    (*out)->Shininess.Set(25.);
 
     (*out)->ShadingModel.Set("Phong");
 
@@ -289,11 +629,15 @@ bool ZoneExporter::create_material(Lumina::Models::Materials::Material^ mat, Fbx
         texture->SetScale(1.0, 1.0);
         texture->SetRotation(0.0, 0.0);
 
+        //System::Console::WriteLine(mat->Textures[i]->TextureUsageRaw);
+        //System::Console::WriteLine(mat->Textures[i]->TextureUsageSimple);
         // We are ignoring the 2nd texture that they use for blending
         switch (mat->Textures[i]->TextureUsageRaw)
         {
-            case Lumina::Data::Parsing::TextureUsage::SamplerColorMap0: (*out)->Diffuse.ConnectSrcObject(texture); break;
-            case Lumina::Data::Parsing::TextureUsage::SamplerSpecularMap0: (*out)->Specular.ConnectSrcObject(texture); break;
+            case Lumina::Data::Parsing::TextureUsage::SamplerColorMap0:
+                (*out)->Diffuse.ConnectSrcObject(texture); break;
+            case Lumina::Data::Parsing::TextureUsage::SamplerSpecularMap0:
+                (*out)->Specular.ConnectSrcObject(texture); break;
             case Lumina::Data::Parsing::TextureUsage::SamplerNormalMap0:
                 (*out)->NormalMap.ConnectSrcObject(texture);
                 break;
@@ -362,6 +706,8 @@ bool ZoneExporter::init(System::String^ game_path)
     scene = FbxScene::Create(manager, name.c_str());
     if (!scene)
         return false;
+    FbxGlobalSettings& globalSettings = scene->GetGlobalSettings();
+    globalSettings.SetSystemUnit(FbxSystemUnit::m);
 
     FbxIOSettings* io = FbxIOSettings::Create(manager, "IOSRoot");
     manager->SetIOSettings(io);

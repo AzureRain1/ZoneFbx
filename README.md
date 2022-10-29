@@ -1,5 +1,11 @@
 # ZoneFbx
 
+Forked from https://github.com/lmcintyre/ZoneFbx. Use SaintCoinach code to export sgb (those smaller objects on a map). It is a Frankenstein but it works.
+
+Also export lights, tested with Cycles in Blender. Eevee will not work because of too many lights.
+
+Lumina cannot be updated beyond 94592a8, until MS decides to support CLR with Net Standard 2.1.
+
 ZoneFbx is a driver program and small C++/CLI library utilizing 
 the FBX SDK to export FFXIV zones to FBX format, complete with textures
 and proper hierarchy/object grouping.

@@ -8,6 +8,7 @@
 #include <Windows.h>
 
 using namespace System;
+using namespace System::Collections::Generic;
 using namespace Lumina::Models::Models;
 
 int main(array<String^>^ args)
@@ -17,7 +18,6 @@ int main(array<String^>^ args)
 	               "zonefbx.exe \"C:\\Program Files (x86)\\SquareEnix\\FINAL FANTASY XIV - A Realm Reborn\\game\\sqpack\""
 	               "ffxiv/fst_f1/fld/f1f1/level/f1f1 \"C:\\Users\\Username\\Desktop\\";
 
-	std::printf("%d\n", args->Length);
 	if (args->Length != 3)
 	{
 		std::printf(usage);
